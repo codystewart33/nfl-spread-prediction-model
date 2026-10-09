@@ -1,0 +1,44 @@
+name: Update NFL model
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "15 9 * * 2"
+      timezone: "America/New_York"
+
+permissions:
+  contents: write
+
+jobs:
+  update-model:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Rebuild NFL predictions
+        run: python build_predictions.py
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "NFL Model Bot"
+          git config user.email "actions@github.com"
+          git add data/current_predictions.csv data/model_metadata.json
+
+          if git diff --staged --quiet; then
+            echo "No prediction changes to commit."
+          else
+            git commit -m "Update NFL model predictions"
+            git push
+          fi
