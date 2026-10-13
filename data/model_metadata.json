@@ -1,9 +1,9 @@
 {
   "season": 2026,
-  "week": 5,
+  "week": 6,
   "edge_threshold": 4.0,
-  "training_games": 2114,
-  "generated_at": "2026-10-09T03:17:40+00:00",
+  "training_games": 2129,
+  "generated_at": "2026-10-13T19:53:07+00:00",
   "model": "StandardScaler + Ridge(alpha=10)",
   "features": [
     "pass_epa_diff",
