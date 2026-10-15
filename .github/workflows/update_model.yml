@@ -28,6 +28,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Rebuild NFL predictions
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: python build_predictions.py
 
       - name: Commit refreshed data
