@@ -23,55 +23,53 @@ st.set_page_config(
 
 st.markdown(
     """
-    <style>
+<style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
 
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }
+.main-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
 
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin-bottom: 0.2rem;
-    }
+.subtitle {
+    color: #888;
+    margin-bottom: 1.5rem;
+}
 
-    .subtitle {
-        color: #888;
-        margin-bottom: 1.5rem;
-    }
+.edge-card {
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 14px;
+}
 
-    .edge-card {
-        border: 1px solid #333;
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 14px;
-    }
+.edge-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
 
-    .edge-title {
-        font-size: 1.25rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
+.edge-pick {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
 
-    .edge-pick {
-        font-size: 1.15rem;
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
+.small-label {
+    color: #888;
+    font-size: 0.85rem;
+}
 
-    .small-label {
-        color: #888;
-        font-size: 0.85rem;
-    }
-
-    .best-line {
-        font-size: 1rem;
-        font-weight: 600;
-    }
-
-    </style>
-    """,
+.best-line {
+    font-size: 1rem;
+    font-weight: 600;
+}
+</style>
+""",
     unsafe_allow_html=True,
 )
 
@@ -138,11 +136,11 @@ st.markdown(
 
 st.markdown(
     """
-    <div class="subtitle">
-    EPA-based NFL spread model with live sportsbook
-    consensus lines and best available prices.
-    </div>
-    """,
+<div class="subtitle">
+EPA-based NFL spread model with live sportsbook
+consensus lines and best available prices.
+</div>
+""",
     unsafe_allow_html=True,
 )
 
@@ -220,6 +218,7 @@ edge_threshold = metadata.get(
     4.0,
 )
 
+
 if "signal" in predictions.columns:
 
     signal_count = int(
@@ -236,11 +235,14 @@ else:
 
 if "book_count" in predictions.columns:
 
-    books_used = int(
-        predictions[
-            "book_count"
-        ].max()
-    )
+    books_used = predictions[
+        "book_count"
+    ].max()
+
+    if pd.isna(books_used):
+        books_used = 0
+    else:
+        books_used = int(books_used)
 
 else:
 
@@ -282,7 +284,7 @@ st.divider()
 
 
 # ============================================================
-# TOP EDGE SIGNALS
+# CURRENT MODEL SIGNALS
 # ============================================================
 
 st.subheader(
@@ -391,15 +393,22 @@ else:
         )
 
         # -----------------------
-        # Format values
+        # FORMAT EDGE
         # -----------------------
 
         if pd.notna(edge):
+
             edge_text = (
                 f"{edge:.2f} pts"
             )
+
         else:
+
             edge_text = "—"
+
+        # -----------------------
+        # FORMAT PRICE
+        # -----------------------
 
         if pd.notna(best_price):
 
@@ -423,6 +432,10 @@ else:
 
             price_text = "—"
 
+        # -----------------------
+        # FORMAT BEST EDGE
+        # -----------------------
+
         if pd.notna(
             best_line_edge
         ):
@@ -435,58 +448,26 @@ else:
 
             best_edge_text = "—"
 
+        # -----------------------
+        # FIXED HTML CARD
+        # -----------------------
+
+        card_html = f"""<div class="edge-card">
+<div class="edge-title">{away} @ {home}</div>
+<div class="small-label">{game_date} {game_time}</div>
+<br>
+<div class="edge-pick">Model Pick: {pick}</div>
+<div>Consensus Market: <strong>{market}</strong></div>
+<div>Model Fair Line: <strong>{fair}</strong></div>
+<div>Consensus Edge: <strong>{edge_text}</strong></div>
+<br>
+<div class="small-label">BEST AVAILABLE</div>
+<div class="best-line">{best_line} at {best_book} ({price_text})</div>
+<div>Edge at Best Line: <strong>{best_edge_text}</strong></div>
+</div>"""
+
         st.markdown(
-            f"""
-            <div class="edge-card">
-
-                <div class="edge-title">
-                    {away} @ {home}
-                </div>
-
-                <div class="small-label">
-                    {game_date} {game_time}
-                </div>
-
-                <br>
-
-                <div class="edge-pick">
-                    Model Pick: {pick}
-                </div>
-
-                <div>
-                    Consensus Market:
-                    <strong>{market}</strong>
-                </div>
-
-                <div>
-                    Model Fair Line:
-                    <strong>{fair}</strong>
-                </div>
-
-                <div>
-                    Consensus Edge:
-                    <strong>{edge_text}</strong>
-                </div>
-
-                <br>
-
-                <div class="small-label">
-                    BEST AVAILABLE
-                </div>
-
-                <div class="best-line">
-                    {best_line}
-                    at {best_book}
-                    ({price_text})
-                </div>
-
-                <div>
-                    Edge at Best Line:
-                    <strong>{best_edge_text}</strong>
-                </div>
-
-            </div>
-            """,
+            card_html,
             unsafe_allow_html=True,
         )
 
@@ -513,7 +494,7 @@ display = predictions.copy()
 
 
 # ============================================================
-# CLEAN DISPLAY NAMES
+# TABLE COLUMN NAMES
 # ============================================================
 
 rename_map = {
@@ -601,7 +582,7 @@ display = display[
 
 
 # ============================================================
-# ROUND NUMERIC VALUES
+# ROUND NUMBERS
 # ============================================================
 
 if "Edge" in display.columns:
@@ -624,6 +605,10 @@ if "Best-Line Edge" in display.columns:
     )
 
 
+# ============================================================
+# FORMAT AMERICAN ODDS
+# ============================================================
+
 if "Price" in display.columns:
 
     def format_price(value):
@@ -634,7 +619,10 @@ if "Price" in display.columns:
         value = int(value)
 
         if value > 0:
-            return f"+{value}"
+
+            return (
+                f"+{value}"
+            )
 
         return str(value)
 
@@ -673,34 +661,42 @@ st.subheader(
 
 st.markdown(
     """
-**Consensus**  
+**Consensus**
+
 Median spread across the sportsbooks currently returned
 by the odds feed.
 
-**Model Fair**  
+**Model Fair**
+
 The spread predicted by the EPA-based Ridge regression model.
 
-**Edge**  
+**Edge**
+
 Difference between the model fair spread and the consensus
 market spread.
 
-**4+ EDGE**  
+**4+ EDGE**
+
 The model differs from the consensus market by at least
 4 points.
 
-**Best Line**  
+**Best Line**
+
 The most favorable spread currently available for the
 model-selected side.
 
-**Sportsbook**  
-The book currently offering that best spread.
+**Sportsbook**
 
-**Price**  
+The sportsbook currently offering that best spread.
+
+**Price**
+
 American odds attached to that spread.
 
-**Best-Line Edge**  
-The model's estimated spread advantage using the best
-available sportsbook number instead of the consensus line.
+**Best-Line Edge**
+
+The model's spread difference using the best available
+sportsbook number instead of the consensus line.
 """
 )
 
@@ -715,6 +711,7 @@ st.divider()
 st.subheader(
     "⚙️ Model"
 )
+
 
 model_name = metadata.get(
     "model",
@@ -759,7 +756,8 @@ with model_col3:
 
 
 st.caption(
-    f"Last model refresh: {generated_at}"
+    f"Last model refresh: "
+    f"{generated_at}"
 )
 
 
@@ -863,6 +861,6 @@ st.divider()
 
 st.caption(
     "This project is for analytical and educational purposes. "
-    "Sportsbook lines can move at any time, and the historical "
-    "results shown above do not guarantee future performance."
+    "Sportsbook lines can move at any time, and historical "
+    "results do not guarantee future performance."
 )
