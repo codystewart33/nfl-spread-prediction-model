@@ -3,7 +3,8 @@
   "week": 6,
   "edge_threshold": 4.0,
   "training_games": 2129,
-  "generated_at": "2026-10-13T19:53:07+00:00",
+  "generated_at": "2026-10-15T02:06:49+00:00",
+  "odds_api_credits_remaining": "499",
   "model": "StandardScaler + Ridge(alpha=10)",
   "features": [
     "pass_epa_diff",
