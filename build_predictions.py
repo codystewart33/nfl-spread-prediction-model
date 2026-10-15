@@ -48,7 +48,7 @@ SPLIT_METRICS = [
 
 
 # ============================================================
-# NFL TEAM NAME MAPPING
+# TEAM NAME MAPPING
 # ============================================================
 
 TEAM_NAME_TO_ABBR = {
@@ -92,9 +92,6 @@ TEAM_NAME_TO_ABBR = {
 # ============================================================
 
 def nfl_season_for_today() -> int:
-    """
-    Return the NFL season year for today's date.
-    """
     today = datetime.now()
 
     return (
@@ -188,7 +185,7 @@ def build_completed_games(
 
 
 # ============================================================
-# WEEKLY PASS / RUSH STATS
+# WEEKLY SPLIT STATS
 # ============================================================
 
 def build_weekly_split_stats(
@@ -202,10 +199,6 @@ def build_weekly_split_stats(
     rush_pbp = pbp[
         pbp["play_type"] == "run"
     ].copy()
-
-    # ---------------------------
-    # PASS OFFENSE
-    # ---------------------------
 
     pass_offense = (
         pass_pbp
@@ -226,10 +219,6 @@ def build_weekly_split_stats(
         )
     )
 
-    # ---------------------------
-    # RUSH OFFENSE
-    # ---------------------------
-
     rush_offense = (
         rush_pbp
         .groupby([
@@ -248,10 +237,6 @@ def build_weekly_split_stats(
             }
         )
     )
-
-    # ---------------------------
-    # PASS DEFENSE
-    # ---------------------------
 
     pass_defense = (
         pass_pbp
@@ -272,10 +257,6 @@ def build_weekly_split_stats(
         )
     )
 
-    # ---------------------------
-    # RUSH DEFENSE
-    # ---------------------------
-
     rush_defense = (
         rush_pbp
         .groupby([
@@ -294,10 +275,6 @@ def build_weekly_split_stats(
             }
         )
     )
-
-    # ---------------------------
-    # MERGE
-    # ---------------------------
 
     weekly = (
         pass_offense
@@ -335,9 +312,9 @@ def build_weekly_split_stats(
         ])
     )
 
-    # ---------------------------
-    # ORIGINAL LAST-5 MODEL
-    # ---------------------------
+    # Equal-weight trailing 5.
+    # shift(1) keeps the current game
+    # out of its own features.
 
     for metric in SPLIT_METRICS:
 
@@ -370,10 +347,6 @@ def add_matchup_differences(
 
     df = df.copy()
 
-    # ---------------------------
-    # OFFENSE
-    # ---------------------------
-
     df["pass_epa_diff"] = (
         df["home_pass_epa"]
         - df["away_pass_epa"]
@@ -384,13 +357,8 @@ def add_matchup_differences(
         - df["away_rush_epa"]
     )
 
-    # ---------------------------
-    # DEFENSE
-    #
-    # Lower EPA allowed is better,
-    # so away - home means positive
-    # favors the home team.
-    # ---------------------------
+    # Lower defensive EPA allowed
+    # is better.
 
     df["pass_def_diff"] = (
         df["away_pass_def_epa"]
@@ -402,10 +370,6 @@ def add_matchup_differences(
         - df["home_rush_def_epa"]
     )
 
-    # ---------------------------
-    # SUCCESS RATE
-    # ---------------------------
-
     df["pass_success_diff"] = (
         df["home_pass_success"]
         - df["away_pass_success"]
@@ -415,10 +379,6 @@ def add_matchup_differences(
         df["home_rush_success"]
         - df["away_rush_success"]
     )
-
-    # ---------------------------
-    # DEFENSIVE SUCCESS RATE
-    # ---------------------------
 
     df["pass_def_success_diff"] = (
         df["away_pass_def_success"]
@@ -434,7 +394,7 @@ def add_matchup_differences(
 
 
 # ============================================================
-# BUILD TRAINING FRAME
+# TRAINING FRAME
 # ============================================================
 
 def build_training_frame(
@@ -464,53 +424,61 @@ def build_training_frame(
         feature_cols
     ].copy()
 
-    # ---------------------------
-    # HOME
-    # ---------------------------
-
     home = split_features.rename(
         columns={
             "team": "home_team",
+
             "last5_pass_epa":
                 "home_pass_epa",
+
             "last5_pass_success":
                 "home_pass_success",
+
             "last5_rush_epa":
                 "home_rush_epa",
+
             "last5_rush_success":
                 "home_rush_success",
+
             "last5_pass_def_epa":
                 "home_pass_def_epa",
+
             "last5_pass_def_success":
                 "home_pass_def_success",
+
             "last5_rush_def_epa":
                 "home_rush_def_epa",
+
             "last5_rush_def_success":
                 "home_rush_def_success",
         }
     )
 
-    # ---------------------------
-    # AWAY
-    # ---------------------------
-
     away = split_features.rename(
         columns={
             "team": "away_team",
+
             "last5_pass_epa":
                 "away_pass_epa",
+
             "last5_pass_success":
                 "away_pass_success",
+
             "last5_rush_epa":
                 "away_rush_epa",
+
             "last5_rush_success":
                 "away_rush_success",
+
             "last5_pass_def_epa":
                 "away_pass_def_epa",
+
             "last5_pass_def_success":
                 "away_pass_def_success",
+
             "last5_rush_def_epa":
                 "away_rush_def_epa",
+
             "last5_rush_def_success":
                 "away_rush_def_success",
         }
@@ -540,16 +508,15 @@ def build_training_frame(
         df
     )
 
-    df = df.dropna(
-        subset=FEATURES
-        + ["home_margin"]
+    return df.dropna(
+        subset=
+            FEATURES
+            + ["home_margin"]
     ).copy()
-
-    return df
 
 
 # ============================================================
-# DETERMINE CURRENT NFL WEEK
+# TARGET WEEK
 # ============================================================
 
 def determine_target_week(
@@ -570,16 +537,10 @@ def determine_target_week(
         )
 
     incomplete = season_sched[
-        schedules.loc[
-            season_sched.index,
-            "home_score",
-        ].isna()
+        season_sched["home_score"].isna()
         |
-        schedules.loc[
-            season_sched.index,
-            "away_score",
-        ].isna()
-    ]
+        season_sched["away_score"].isna()
+    ].copy()
 
     if incomplete.empty:
 
@@ -604,11 +565,8 @@ def current_team_features(
     target_week: int,
 ) -> pd.DataFrame:
 
-    # Only use games before the
-    # target week.
-    #
-    # This prevents Thursday results
-    # from leaking into Sunday games.
+    # Only use games strictly before
+    # the target week.
 
     history = weekly[
         (weekly["season"] < current_season)
@@ -619,13 +577,11 @@ def current_team_features(
         )
     ].copy()
 
-    history = history.sort_values(
-        [
-            "team",
-            "season",
-            "week",
-        ]
-    )
+    history = history.sort_values([
+        "team",
+        "season",
+        "week",
+    ])
 
     recent_five = (
         history
@@ -636,7 +592,7 @@ def current_team_features(
         .tail(5)
     )
 
-    current = (
+    return (
         recent_five
         .groupby("team")[
             SPLIT_METRICS
@@ -645,11 +601,9 @@ def current_team_features(
         .reset_index()
     )
 
-    return current
-
 
 # ============================================================
-# BUILD UPCOMING GAME FRAME
+# UPCOMING GAMES
 # ============================================================
 
 def build_upcoming_frame(
@@ -678,55 +632,63 @@ def build_upcoming_frame(
             f"Week {target_week}."
         )
 
-    # ---------------------------
-    # HOME CURRENT FEATURES
-    # ---------------------------
-
     home = current_features.rename(
         columns={
             "team":
                 "home_team",
+
             "pass_epa":
                 "home_pass_epa",
+
             "pass_success":
                 "home_pass_success",
+
             "rush_epa":
                 "home_rush_epa",
+
             "rush_success":
                 "home_rush_success",
+
             "pass_def_epa":
                 "home_pass_def_epa",
+
             "pass_def_success":
                 "home_pass_def_success",
+
             "rush_def_epa":
                 "home_rush_def_epa",
+
             "rush_def_success":
                 "home_rush_def_success",
         }
     )
 
-    # ---------------------------
-    # AWAY CURRENT FEATURES
-    # ---------------------------
-
     away = current_features.rename(
         columns={
             "team":
                 "away_team",
+
             "pass_epa":
                 "away_pass_epa",
+
             "pass_success":
                 "away_pass_success",
+
             "rush_epa":
                 "away_rush_epa",
+
             "rush_success":
                 "away_rush_success",
+
             "pass_def_epa":
                 "away_pass_def_epa",
+
             "pass_def_success":
                 "away_pass_def_success",
+
             "rush_def_epa":
                 "away_rush_def_epa",
+
             "rush_def_success":
                 "away_rush_def_success",
         }
@@ -744,19 +706,19 @@ def build_upcoming_frame(
         how="left",
     )
 
-    upcoming = add_matchup_differences(
-        upcoming
+    upcoming = (
+        add_matchup_differences(
+            upcoming
+        )
     )
 
-    upcoming = upcoming.dropna(
+    return upcoming.dropna(
         subset=FEATURES
     ).copy()
 
-    return upcoming
-
 
 # ============================================================
-# FETCH LIVE SPORTSBOOK SPREADS
+# LIVE SPORTSBOOK ODDS
 # ============================================================
 
 def fetch_live_spreads(
@@ -787,7 +749,8 @@ def fetch_live_spreads(
 
     events = response.json()
 
-    rows = []
+    consensus_rows = []
+    book_rows = []
 
     for event in events:
 
@@ -824,6 +787,14 @@ def fetch_live_spreads(
             [],
         ):
 
+            book_key = bookmaker.get(
+                "key"
+            )
+
+            book_title = bookmaker.get(
+                "title"
+            )
+
             for market in bookmaker.get(
                 "markets",
                 [],
@@ -840,37 +811,81 @@ def fetch_live_spreads(
                     [],
                 ):
 
-                    if (
-                        outcome.get("name")
-                        == home_name
-                        and outcome.get(
-                            "point"
+                    outcome_name = (
+                        outcome.get(
+                            "name"
                         )
-                        is not None
+                    )
+
+                    point = outcome.get(
+                        "point"
+                    )
+
+                    price = outcome.get(
+                        "price"
+                    )
+
+                    team = (
+                        TEAM_NAME_TO_ABBR.get(
+                            outcome_name
+                        )
+                    )
+
+                    if (
+                        team is None
+                        or point is None
+                    ):
+                        continue
+
+                    point = float(
+                        point
+                    )
+
+                    if price is not None:
+                        price = int(
+                            price
+                        )
+
+                    book_rows.append({
+                        "home_team":
+                            home_team,
+
+                        "away_team":
+                            away_team,
+
+                        "team":
+                            team,
+
+                        "bookmaker_key":
+                            book_key,
+
+                        "bookmaker":
+                            book_title,
+
+                        "book_spread":
+                            point,
+
+                        "book_price":
+                            price,
+                    })
+
+                    if (
+                        outcome_name
+                        == home_name
                     ):
 
                         home_points.append(
-                            float(
-                                outcome[
-                                    "point"
-                                ]
-                            )
+                            point
                         )
 
         if not home_points:
             continue
 
-        # Example:
-        #
         # Sportsbook:
-        # GB -3
+        # home -3
         #
-        # Our model convention:
-        # positive = home favored
-        #
-        # Therefore:
-        # -3 sportsbook
-        # becomes +3 model spread_line.
+        # Model convention:
+        # +3 means home favored by 3.
 
         consensus_home_point = float(
             np.median(
@@ -882,32 +897,46 @@ def fetch_live_spreads(
             -consensus_home_point
         )
 
-        rows.append({
+        consensus_rows.append({
             "home_team":
                 home_team,
+
             "away_team":
                 away_team,
+
             "live_spread_line":
                 live_spread_line,
+
             "book_count":
                 len(home_points),
+
             "commence_time":
                 event.get(
                     "commence_time"
                 ),
         })
 
-    # Always create expected columns,
-    # even if no odds were returned.
-
     odds_df = pd.DataFrame(
-        rows,
+        consensus_rows,
         columns=[
             "home_team",
             "away_team",
             "live_spread_line",
             "book_count",
             "commence_time",
+        ],
+    )
+
+    book_lines_df = pd.DataFrame(
+        book_rows,
+        columns=[
+            "home_team",
+            "away_team",
+            "team",
+            "bookmaker_key",
+            "bookmaker",
+            "book_spread",
+            "book_price",
         ],
     )
 
@@ -929,11 +958,15 @@ def fetch_live_spreads(
         f"used: {used}"
     )
 
-    return odds_df, remaining
+    return (
+        odds_df,
+        book_lines_df,
+        remaining,
+    )
 
 
 # ============================================================
-# DISPLAY HELPERS
+# FORMAT MODEL PICK
 # ============================================================
 
 def format_model_pick(
@@ -941,7 +974,9 @@ def format_model_pick(
 ) -> str:
 
     if pd.isna(
-        row.get("spread_line")
+        row.get(
+            "spread_line"
+        )
     ):
         return "NO LINE"
 
@@ -971,7 +1006,10 @@ def format_model_pick(
         team_spread,
         0,
     ):
-        return f"{team} PK"
+
+        return (
+            f"{team} PK"
+        )
 
     if team_spread > 0:
 
@@ -986,12 +1024,18 @@ def format_model_pick(
     )
 
 
+# ============================================================
+# FORMAT MARKET LINE
+# ============================================================
+
 def format_market_line(
     row
 ) -> str:
 
     if pd.isna(
-        row.get("spread_line")
+        row.get(
+            "spread_line"
+        )
     ):
         return "NO LINE"
 
@@ -1005,8 +1049,8 @@ def format_market_line(
     ):
         return "PK"
 
-    # Positive spread_line
-    # means HOME favored.
+    # Positive spread_line =
+    # home team favored.
 
     if spread > 0:
 
@@ -1020,6 +1064,10 @@ def format_market_line(
         f"{spread:g}"
     )
 
+
+# ============================================================
+# FORMAT MODEL FAIR SPREAD
+# ============================================================
 
 def format_fair_spread(
     row
@@ -1050,6 +1098,212 @@ def format_fair_spread(
 
 
 # ============================================================
+# BEST AVAILABLE SPORTSBOOK LINE
+# ============================================================
+
+def add_best_available_lines(
+    upcoming: pd.DataFrame,
+    book_lines: pd.DataFrame,
+) -> pd.DataFrame:
+
+    upcoming = upcoming.copy()
+
+    upcoming[
+        "best_bookmaker"
+    ] = None
+
+    upcoming[
+        "best_spread"
+    ] = np.nan
+
+    upcoming[
+        "best_price"
+    ] = np.nan
+
+    upcoming[
+        "best_available_line"
+    ] = None
+
+    upcoming[
+        "best_line_edge"
+    ] = np.nan
+
+    if book_lines.empty:
+        return upcoming
+
+    for idx, row in (
+        upcoming.iterrows()
+    ):
+
+        if pd.isna(
+            row["edge"]
+        ):
+            continue
+
+        # Model side is determined from
+        # the CONSENSUS market edge.
+
+        if row["edge"] > 0:
+
+            pick_team = row[
+                "home_team"
+            ]
+
+            pick_is_home = True
+
+        else:
+
+            pick_team = row[
+                "away_team"
+            ]
+
+            pick_is_home = False
+
+        options = book_lines[
+            (
+                book_lines[
+                    "home_team"
+                ]
+                == row[
+                    "home_team"
+                ]
+            )
+            &
+            (
+                book_lines[
+                    "away_team"
+                ]
+                == row[
+                    "away_team"
+                ]
+            )
+            &
+            (
+                book_lines[
+                    "team"
+                ]
+                == pick_team
+            )
+        ].copy()
+
+        if options.empty:
+            continue
+
+        # Bigger number is always better
+        # for the bettor:
+        #
+        # +7 > +6.5
+        # -2.5 > -3
+
+        best_spread = (
+            options[
+                "book_spread"
+            ].max()
+        )
+
+        best_options = options[
+            options[
+                "book_spread"
+            ]
+            == best_spread
+        ].copy()
+
+        # If multiple books have the
+        # same line, use the best juice.
+
+        best_options = (
+            best_options
+            .sort_values(
+                "book_price",
+                ascending=False,
+                na_position="last",
+            )
+        )
+
+        best = (
+            best_options.iloc[0]
+        )
+
+        bookmaker = best[
+            "bookmaker"
+        ]
+
+        price = best[
+            "book_price"
+        ]
+
+        if np.isclose(
+            best_spread,
+            0,
+        ):
+
+            formatted_line = (
+                f"{pick_team} PK"
+            )
+
+        elif best_spread > 0:
+
+            formatted_line = (
+                f"{pick_team} "
+                f"+{best_spread:g}"
+            )
+
+        else:
+
+            formatted_line = (
+                f"{pick_team} "
+                f"{best_spread:g}"
+            )
+
+        # Edge versus actual best line.
+
+        if pick_is_home:
+
+            best_line_edge = (
+                row[
+                    "model_margin"
+                ]
+                + best_spread
+            )
+
+        else:
+
+            best_line_edge = (
+                best_spread
+                - row[
+                    "model_margin"
+                ]
+            )
+
+        upcoming.at[
+            idx,
+            "best_bookmaker",
+        ] = bookmaker
+
+        upcoming.at[
+            idx,
+            "best_spread",
+        ] = best_spread
+
+        upcoming.at[
+            idx,
+            "best_price",
+        ] = price
+
+        upcoming.at[
+            idx,
+            "best_available_line",
+        ] = formatted_line
+
+        upcoming.at[
+            idx,
+            "best_line_edge",
+        ] = best_line_edge
+
+    return upcoming
+
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -1059,12 +1313,14 @@ def main():
         nfl_season_for_today()
     )
 
-    # ---------------------------
-    # LOAD DATA
-    # ---------------------------
+    # --------------------------------------------------------
+    # LOAD NFL DATA
+    # --------------------------------------------------------
 
-    schedules, pbp = load_data(
-        current_season
+    schedules, pbp = (
+        load_data(
+            current_season
+        )
     )
 
     weekly = (
@@ -1097,9 +1353,9 @@ def main():
         f"{target_week}"
     )
 
-    # ---------------------------
-    # TRAINING DATA
-    # ---------------------------
+    # --------------------------------------------------------
+    # PRODUCTION TRAINING DATA
+    # --------------------------------------------------------
 
     production_train = (
         training_frame[
@@ -1135,9 +1391,9 @@ def main():
             "Training dataset is empty."
         )
 
-    # ---------------------------
-    # MODEL
-    # ---------------------------
+    # --------------------------------------------------------
+    # TRAIN MODEL
+    # --------------------------------------------------------
 
     model = Pipeline([
         (
@@ -1161,9 +1417,9 @@ def main():
         ],
     )
 
-    # ---------------------------
-    # CURRENT TEAM RATINGS
-    # ---------------------------
+    # --------------------------------------------------------
+    # CURRENT TEAM FEATURES
+    # --------------------------------------------------------
 
     team_features = (
         current_team_features(
@@ -1175,9 +1431,9 @@ def main():
         )
     )
 
-    # ---------------------------
+    # --------------------------------------------------------
     # UPCOMING GAMES
-    # ---------------------------
+    # --------------------------------------------------------
 
     upcoming = (
         build_upcoming_frame(
@@ -1191,15 +1447,12 @@ def main():
     )
 
     # ========================================================
-    # CURRENT SPORTSBOOK SPREADS
+    # LIVE SPORTSBOOK SPREADS
     # ========================================================
 
     api_key = os.getenv(
         "THE_ODDS_API_KEY"
     )
-
-    # Preserve nflverse line
-    # as backup.
 
     upcoming[
         "nflverse_spread_line"
@@ -1209,14 +1462,20 @@ def main():
 
     odds_remaining = None
 
+    book_lines = (
+        pd.DataFrame()
+    )
+
     if api_key:
 
         try:
 
-            live_odds, odds_remaining = (
-                fetch_live_spreads(
-                    api_key
-                )
+            (
+                live_odds,
+                book_lines,
+                odds_remaining,
+            ) = fetch_live_spreads(
+                api_key
             )
 
             if not live_odds.empty:
@@ -1242,9 +1501,8 @@ def main():
                     "book_count"
                 ] = 0
 
-            # -----------------------
-            # LIVE ODDS FIRST
-            # -----------------------
+            # Live consensus first.
+            # nflverse is fallback.
 
             upcoming[
                 "spread_line"
@@ -1290,6 +1548,10 @@ def main():
                 "nflverse fallback"
             )
 
+            book_lines = (
+                pd.DataFrame()
+            )
+
     else:
 
         print(
@@ -1310,6 +1572,10 @@ def main():
             "line_source"
         ] = (
             "nflverse fallback"
+        )
+
+        book_lines = (
+            pd.DataFrame()
         )
 
     # ========================================================
@@ -1341,13 +1607,11 @@ def main():
 
     upcoming[
         "abs_edge"
-    ] = upcoming[
-        "edge"
-    ].abs()
-
-    # ---------------------------
-    # FORMATTED OUTPUT
-    # ---------------------------
+    ] = (
+        upcoming[
+            "edge"
+        ].abs()
+    )
 
     upcoming[
         "model_pick"
@@ -1370,6 +1634,10 @@ def main():
         axis=1,
     )
 
+    # --------------------------------------------------------
+    # 4+ CONSENSUS SIGNAL
+    # --------------------------------------------------------
+
     upcoming[
         "signal"
     ] = np.select(
@@ -1380,7 +1648,8 @@ def main():
 
             upcoming[
                 "abs_edge"
-            ] >= EDGE_THRESHOLD,
+            ]
+            >= EDGE_THRESHOLD,
         ],
         [
             "NO LINE",
@@ -1389,9 +1658,20 @@ def main():
         default="PASS",
     )
 
-    # ---------------------------
+    # ========================================================
+    # BEST AVAILABLE SPORTSBOOK LINE
+    # ========================================================
+
+    upcoming = (
+        add_best_available_lines(
+            upcoming,
+            book_lines,
+        )
+    )
+
+    # --------------------------------------------------------
     # TIMESTAMP
-    # ---------------------------
+    # --------------------------------------------------------
 
     now = (
         datetime
@@ -1406,31 +1686,44 @@ def main():
     )
 
     # ========================================================
-    # SAVE PREDICTIONS
+    # SAVE CURRENT PREDICTIONS
     # ========================================================
 
     keep_cols = [
         c
         for c in [
+
             "season",
             "week",
+
             "gameday",
             "gametime",
+
             "away_team",
             "home_team",
 
+            # Market
             "market_line",
             "spread_line",
 
+            # Model
             "model_fair_spread",
             "model_margin",
 
+            # Consensus edge
             "edge",
             "abs_edge",
 
             "model_pick",
             "signal",
 
+            # Best available book
+            "best_available_line",
+            "best_bookmaker",
+            "best_price",
+            "best_line_edge",
+
+            # Market metadata
             "line_source",
             "book_count",
 
@@ -1451,9 +1744,9 @@ def main():
         )
     )
 
-    # ---------------------------
+    # --------------------------------------------------------
     # DATA DIRECTORY
-    # ---------------------------
+    # --------------------------------------------------------
 
     data_dir = Path(
         "data"
@@ -1464,9 +1757,9 @@ def main():
         exist_ok=True,
     )
 
-    # ---------------------------
-    # CSV
-    # ---------------------------
+    # --------------------------------------------------------
+    # SAVE CSV
+    # --------------------------------------------------------
 
     output.to_csv(
         data_dir
@@ -1475,7 +1768,7 @@ def main():
     )
 
     # ========================================================
-    # MODEL METADATA
+    # METADATA
     # ========================================================
 
     metadata = {
@@ -1571,19 +1864,29 @@ def main():
 
     print()
 
+    display_cols = [
+        c
+        for c in [
+            "away_team",
+            "home_team",
+            "market_line",
+            "model_fair_spread",
+            "edge",
+            "model_pick",
+            "signal",
+            "best_available_line",
+            "best_bookmaker",
+            "best_price",
+            "best_line_edge",
+            "line_source",
+            "book_count",
+        ]
+        if c in output.columns
+    ]
+
     print(
         output[
-            [
-                "away_team",
-                "home_team",
-                "market_line",
-                "model_fair_spread",
-                "edge",
-                "model_pick",
-                "signal",
-                "line_source",
-                "book_count",
-            ]
+            display_cols
         ]
         .round(2)
         .to_string(
