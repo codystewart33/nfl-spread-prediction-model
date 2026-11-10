@@ -1,10 +1,10 @@
 {
   "season": 2026,
-  "week": 9,
+  "week": 10,
   "edge_threshold": 4.0,
-  "training_games": 2171,
-  "generated_at": "2026-11-03T20:30:52+00:00",
-  "odds_api_credits_remaining": "499",
+  "training_games": 2186,
+  "generated_at": "2026-11-10T20:50:06+00:00",
+  "odds_api_credits_remaining": "498",
   "model": "StandardScaler + Ridge(alpha=10)",
   "features": [
     "pass_epa_diff",
