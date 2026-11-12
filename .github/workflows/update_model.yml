@@ -1,3 +1,4 @@
+
 name: Update NFL model
 
 on:
@@ -25,22 +26,26 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: python -m pip install -r requirements.txt
 
       - name: Rebuild NFL predictions
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: python build_predictions.py
 
-      - name: Commit refreshed data
+      - name: Freeze pregame lines and grade finished games
+        run: python track_results.py
+
+      - name: Save generated data back to GitHub
         run: |
           git config user.name "NFL Model Bot"
           git config user.email "actions@github.com"
-          git add data/current_predictions.csv data/model_metadata.json
+
+          git add data/current_predictions.csv data/model_metadata.json data/prediction_history.csv
 
           if git diff --staged --quiet; then
             echo "No prediction changes to commit."
           else
-            git commit -m "Update NFL model predictions"
+            git commit -m "Update NFL model and tracked results"
             git push
           fi
