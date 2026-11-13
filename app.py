@@ -180,6 +180,22 @@ predictions["_kickoff"] = pd.to_datetime(
     predictions["gameday"].astype(str) + " " + predictions["gametime"].astype(str),
     errors="coerce",
 )
+# Hide games that have already kicked off.
+# NFL schedule times are in Eastern Time.
+
+now_et = (
+    pd.Timestamp.now(tz="America/New_York")
+    .tz_localize(None)
+)
+
+predictions = predictions[
+    predictions["_kickoff"].notna()
+    & (predictions["_kickoff"] > now_et)
+].copy()
+
+if predictions.empty:
+    st.info("No upcoming games are currently available.")
+    st.stop()
 
 season = safe_text(metadata.get("season", predictions["season"].iloc[0] if "season" in predictions else None))
 week = safe_text(metadata.get("week", predictions["week"].iloc[0] if "week" in predictions else None))
