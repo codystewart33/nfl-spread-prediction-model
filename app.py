@@ -334,8 +334,7 @@ div[data-testid="stMetric"] {
 # WEBSITE HEADER
 # ============================================================
 
-st.markdown(
-    """
+st.html("""
 <div class="dashboard-hero">
     <div class="dashboard-eyebrow">
         NFL · SPORTS ANALYTICS
@@ -350,9 +349,7 @@ st.markdown(
         best available lines
     </p>
 </div>
-""",
-    unsafe_allow_html=True,
-)
+""")
 
 
 # ============================================================
