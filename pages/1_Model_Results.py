@@ -1,20 +1,14 @@
 
-"""NFL Spread Lab | Official Model Results.
+"""NFL Spread Lab — forward-tracked model results dashboard.
 
-Displays frozen pre-kickoff quotes saved by track_results.py.
-Does not revise picks or calculate new predictions.
+Presentation only. Reads the frozen data written by track_results.py.
 """
 
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import streamlit as st
-
-
-# ============================================================
-# PAGE SETTINGS
-# ============================================================
 
 st.set_page_config(
     page_title="Model Results | NFL Spread Lab",
@@ -24,6 +18,25 @@ st.set_page_config(
 
 HISTORY_PATH = Path("data/prediction_history.csv")
 
+TEAM_NAMES = {
+    "ARI": "Cardinals", "ATL": "Falcons",
+    "BAL": "Ravens", "BUF": "Bills",
+    "CAR": "Panthers", "CHI": "Bears",
+    "CIN": "Bengals", "CLE": "Browns",
+    "DAL": "Cowboys", "DEN": "Broncos",
+    "DET": "Lions", "GB": "Packers",
+    "HOU": "Texans", "IND": "Colts",
+    "JAX": "Jaguars", "KC": "Chiefs",
+    "LA": "Rams", "LAC": "Chargers",
+    "LV": "Raiders", "MIA": "Dolphins",
+    "MIN": "Vikings", "NE": "Patriots",
+    "NO": "Saints", "NYG": "Giants",
+    "NYJ": "Jets", "PHI": "Eagles",
+    "PIT": "Steelers", "SEA": "Seahawks",
+    "SF": "49ers", "TB": "Buccaneers",
+    "TEN": "Titans", "WAS": "Commanders",
+}
+
 ESPN_CODES = {
     "LA": "lar",
     "WAS": "wsh",
@@ -31,59 +44,39 @@ ESPN_CODES = {
     "JAC": "jax",
 }
 
-TEAM_NAMES = {
-    "ARI": "Cardinals",
-    "ATL": "Falcons",
-    "BAL": "Ravens",
-    "BUF": "Bills",
-    "CAR": "Panthers",
-    "CHI": "Bears",
-    "CIN": "Bengals",
-    "CLE": "Browns",
-    "DAL": "Cowboys",
-    "DEN": "Broncos",
-    "DET": "Lions",
-    "GB": "Packers",
-    "HOU": "Texans",
-    "IND": "Colts",
-    "JAX": "Jaguars",
-    "KC": "Chiefs",
-    "LA": "Rams",
-    "LAC": "Chargers",
-    "LV": "Raiders",
-    "MIA": "Dolphins",
-    "MIN": "Vikings",
-    "NE": "Patriots",
-    "NO": "Saints",
-    "NYG": "Giants",
-    "NYJ": "Jets",
-    "PHI": "Eagles",
-    "PIT": "Steelers",
-    "SEA": "Seahawks",
-    "SF": "49ers",
-    "TB": "Buccaneers",
-    "TEN": "Titans",
-    "WAS": "Commanders",
-}
 
-
-def logo(team):
+def team_logo(team):
     code = ESPN_CODES.get(
         str(team).upper(),
         str(team).lower(),
     )
+
     return (
-        "https://a.espncdn.com/i/teamlogos/nfl/"
-        f"500/{code}.png"
+        "https://a.espncdn.com/i/teamlogos/"
+        f"nfl/500/{code}.png"
     )
 
 
+def readable(value, fallback="—"):
+    if value is None or pd.isna(value):
+        return fallback
+
+    return str(value)
+
+
 def price_label(value):
-    if pd.isna(value):
+    number = pd.to_numeric(
+        value,
+        errors="coerce",
+    )
+
+    if pd.isna(number):
         return "—"
 
-    num = int(float(value))
-    return f"+{num}" if num > 0 else str(num)
+    if number > 0:
+        return f"{int(number):+d}"
+
+    return str(int(number))
 
 
 def kickoff_label(value):
@@ -103,11 +96,11 @@ def kickoff_label(value):
 
 
 def record(frame):
-    wins = int(frame["status"].eq("WIN").sum())
-    losses = int(frame["status"].eq("LOSS").sum())
-    pushes = int(frame["status"].eq("PUSH").sum())
-
-    return wins, losses, pushes
+    return (
+        int(frame["status"].eq("WIN").sum()),
+        int(frame["status"].eq("LOSS").sum()),
+        int(frame["status"].eq("PUSH").sum()),
+    )
 
 
 @st.cache_data(ttl=120)
@@ -116,75 +109,93 @@ def load_history():
 
 
 # ============================================================
-# PAGE DESIGN
+# WEBSITE DESIGN
 # ============================================================
+
+# Extra top padding keeps the header below
+# Streamlit's top toolbar.
 
 st.html("""
 <style>
-.block-container {
-    max-width: 1280px;
-    padding-top: 1.5rem;
-    padding-bottom: 4rem;
+
+.block-container,
+[data-testid="stAppViewBlockContainer"] {
+    max-width: 1250px;
+    padding-top: 5.5rem !important;
+    padding-bottom: 3rem;
 }
 
 .results-hero {
     background: linear-gradient(
-        120deg,
-        #101e35,
+        115deg,
+        #101e35 0%,
         #173956 55%,
-        #125e68
+        #125e68 100%
     );
+
+    border: 1px solid rgba(147,197,253,.20);
     border-radius: 18px;
-    border: 1px solid #325b75;
-    padding: 25px 28px;
+    padding: 25px 30px;
+    margin: 0 0 1.2rem;
     color: #f8fafc;
-    margin-bottom: 16px;
 }
 
 .results-eyebrow {
-    font-size: .78rem;
-    letter-spacing: .15em;
     color: #82e8de;
-    font-weight: 700;
+    font-size: .75rem;
+    letter-spacing: .14em;
+    font-weight: 750;
 }
 
 .results-title {
-    font-size: 2.1rem;
-    line-height: 1.25;
+    font-size: clamp(1.8rem, 3vw, 2.3rem);
     font-weight: 800;
-    margin: 6px 0;
+    line-height: 1.22;
+    margin: 8px 0;
 }
 
-.results-sub {
-    font-size: .96rem;
+.results-subtitle {
     color: #cbd5e1;
+    font-size: .95rem;
     margin: 0;
 }
 
-div[data-testid="stMetric"] {
-    border: 1px solid rgba(140,150,170,.2);
+[data-testid="stMetric"] {
+    border: 1px solid rgba(140,150,170,.20);
     background: rgba(120,140,160,.045);
     border-radius: 12px;
-    padding: 12px 16px;
+    padding: 12px 15px;
 }
 
 [data-testid="stMetricValue"] {
     font-size: 1.55rem;
 }
+
+@media (max-width: 640px) {
+    .block-container,
+    [data-testid="stAppViewBlockContainer"] {
+        padding-top: 5rem !important;
+    }
+
+    .results-hero {
+        padding: 21px 19px;
+    }
+}
+
 </style>
 
 <div class="results-hero">
     <div class="results-eyebrow">
-        NFL · OFFICIAL FORWARD TRACKING
+        NFL · VERIFIED PREGAME SNAPSHOTS
     </div>
 
     <div class="results-title">
         Model Results
     </div>
 
-    <p class="results-sub">
-        Frozen pregame selections · verified game scores ·
-        performance by week
+    <p class="results-subtitle">
+        Locked selections · Weekly performance ·
+        Cumulative results
     </p>
 </div>
 """)
@@ -196,8 +207,8 @@ div[data-testid="stMetric"] {
 
 if not HISTORY_PATH.exists():
     st.info(
-        "No saved results yet. The tracker creates "
-        "this file after a successful model update."
+        "No prediction history yet. "
+        "Run the GitHub model tracker to create it."
     )
     st.stop()
 
@@ -208,37 +219,45 @@ except (
     OSError,
     pd.errors.EmptyDataError,
     pd.errors.ParserError,
-) as error:
-    st.error(f"Could not load prediction history: {error}")
+) as exc:
+    st.error(
+        f"Could not load prediction history: {exc}"
+    )
     st.stop()
 
+if history.empty:
+    st.info(
+        "The history file is empty. "
+        "The first pregame snapshots will appear here."
+    )
+    st.stop()
+
+
+# ============================================================
+# CHECK REQUIRED COLUMNS
+# ============================================================
 
 required = {
     "season",
     "week",
     "away_team",
     "home_team",
-    "status",
     "signal",
+    "status",
     "kickoff_utc",
     "model_pick",
     "consensus_edge",
     "profit_units",
 }
 
-missing = required - set(history.columns)
+missing = required.difference(
+    history.columns
+)
 
 if missing:
     st.error(
-        "Missing result columns: "
+        "Missing history columns: "
         + ", ".join(sorted(missing))
-    )
-    st.stop()
-
-if history.empty:
-    st.info(
-        "The tracker is set up, but no pregame "
-        "predictions have been saved yet."
     )
     st.stop()
 
@@ -258,18 +277,18 @@ numeric_columns = [
 ]
 
 for col in numeric_columns:
-    if col in history.columns:
+    if col in history:
         history[col] = pd.to_numeric(
             history[col],
             errors="coerce",
         )
 
-history["status"] = (
-    history["status"].fillna("PENDING")
-)
-
 history["signal"] = (
     history["signal"].fillna("PASS")
+)
+
+history["status"] = (
+    history["status"].fillna("PENDING")
 )
 
 history["kickoff_sort"] = pd.to_datetime(
@@ -280,34 +299,40 @@ history["kickoff_sort"] = pd.to_datetime(
 
 
 # ============================================================
-# SELECT SEASON
+# SEASON SELECTOR
 # ============================================================
 
 seasons = sorted(
     history["season"]
     .dropna()
     .astype(int)
-    .unique(),
+    .unique()
+    .tolist(),
     reverse=True,
 )
 
 if not seasons:
-    st.warning("No valid seasons found in saved history.")
+    st.info(
+        "No valid season found in prediction history."
+    )
     st.stop()
 
-left, right = st.columns([1, 3])
+filter_col, desc_col = st.columns(
+    [1, 3],
+    vertical_alignment="bottom",
+)
 
-with left:
+with filter_col:
     selected_season = st.selectbox(
         "Season",
         seasons,
     )
 
-with right:
+with desc_col:
     st.caption(
-        "These results use the **first eligible "
-        "pre-kickoff quote**. Later changes on the "
-        "homepage never rewrite them."
+        "Only predictions saved before kickoff "
+        "are counted here. Current sportsbook "
+        "lines may be different."
     )
 
 
@@ -331,15 +356,19 @@ settled = signals.loc[
     ])
 ].copy()
 
-w, l, p = record(settled)
+wins, losses, pushes = record(settled)
+
+pending = int(
+    len(signals) - len(settled)
+)
 
 profit = float(
     settled["profit_units"].fillna(0).sum()
 )
 
-win_pct = (
-    100 * w / (w + l)
-    if w + l
+win_rate = (
+    100 * wins / (wins + losses)
+    if wins + losses
     else None
 )
 
@@ -351,194 +380,303 @@ roi = (
 
 
 # ============================================================
-# PERFORMANCE METRICS
+# MAIN DASHBOARD METRICS
 # ============================================================
 
 m1, m2, m3, m4 = st.columns(4)
 
 m1.metric(
-    "Official 4+ Signals",
+    "Locked 4+ Signals",
     len(signals),
 )
 
 m2.metric(
     "Record (W–L–P)",
-    f"{w}–{l}–{p}",
+    f"{wins}–{losses}–{pushes}",
 )
 
 m3.metric(
     "Win Rate",
-    f"{win_pct:.1f}%"
-    if win_pct is not None
+    f"{win_rate:.1f}%"
+    if win_rate is not None
     else "—",
 )
 
 m4.metric(
-    "Profit / ROI",
+    "Units / ROI",
     f"{profit:+.2f} units"
     if len(settled)
     else "—",
-    delta=(
+    help=(
         f"{roi:+.1f}% ROI"
         if roi is not None
-        else None
+        else "No graded signals yet"
     ),
-    delta_color="off",
+)
+
+roi_caption = (
+    f"ROI: {roi:+.1f}% · "
+    if roi is not None
+    else ""
 )
 
 st.caption(
-    f"{len(settled)} settled official signals · "
-    f"{len(signals) - len(settled)} pending · "
-    "Win rate excludes pushes. ROI counts one "
-    "unit staked per settled signal, including pushes."
+    f"{len(settled)} settled · "
+    f"{pending} pending · "
+    f"{roi_caption}"
+    "One hypothetical unit staked per official "
+    "4+ signal; pushes count in settled stakes."
 )
 
 
 # ============================================================
-# WEEKLY PERFORMANCE CARDS
+# NEW BALANCED PERFORMANCE SECTION
 # ============================================================
 
-st.divider()
+st.subheader("Season Performance")
 
-st.subheader("📊 Weekly Performance")
+weekly_col, trend_col = st.columns(
+    [1, 1.3],
+    gap="medium",
+)
 
-if signals.empty:
-    st.info(
-        "No locked 4+ point signals have been "
-        "recorded for this season."
-    )
 
-else:
-    weeks = sorted(
-        signals["week"]
-        .dropna()
-        .astype(int)
-        .unique(),
-        reverse=True,
-    )
+# ============================================================
+# LEFT SIDE: WEEKLY BREAKDOWN
+# ============================================================
 
-    for start in range(0, len(weeks), 3):
-        cols = st.columns(3)
+with weekly_col:
 
-        for col, week in zip(
-            cols,
-            weeks[start:start + 3],
-        ):
-            frame = signals.loc[
-                signals["week"].eq(week)
-            ]
+    with st.container(border=True):
 
-            completed = frame.loc[
-                frame["status"].isin([
-                    "WIN",
-                    "LOSS",
-                    "PUSH",
-                ])
-            ]
+        st.markdown("**Weekly Breakdown**")
 
-            ww, ll, pp = record(completed)
+        st.caption(
+            "Official 4+ signals organized by week"
+        )
 
-            week_profit = (
-                completed["profit_units"]
-                .fillna(0)
-                .sum()
+        if signals.empty:
+
+            st.write(
+                "No official signals recorded yet."
             )
 
-            with col:
-                with st.container(border=True):
-                    st.markdown(f"**WEEK {week}**")
+        else:
 
-                    st.metric(
-                        "Record",
-                        f"{ww}-{ll}-{pp}",
-                    )
+            rows = []
 
-                    st.metric(
-                        "Units",
-                        f"{week_profit:+.2f}"
-                        if len(completed)
-                        else "—",
-                    )
+            for week, group in signals.groupby(
+                "week",
+                sort=True,
+            ):
 
-                    st.caption(
-                        f"{len(completed)} settled · "
-                        f"{len(frame) - len(completed)} "
-                        "pending"
-                    )
+                done = group.loc[
+                    group["status"].isin([
+                        "WIN",
+                        "LOSS",
+                        "PUSH",
+                    ])
+                ]
+
+                w, l, p = record(done)
+
+                week_profit = float(
+                    done["profit_units"]
+                    .fillna(0)
+                    .sum()
+                )
+
+                rows.append({
+                    "Week": int(week),
+
+                    "Record": (
+                        f"{w}-{l}-{p}"
+                        if len(done)
+                        else "—"
+                    ),
+
+                    "Pending": (
+                        len(group) - len(done)
+                    ),
+
+                    "Units": (
+                        round(week_profit, 2)
+                        if len(done)
+                        else np.nan
+                    ),
+                })
+
+            weekly_table = pd.DataFrame(
+                rows
+            ).sort_values(
+                "Week",
+                ascending=False,
+            )
+
+            st.dataframe(
+                weekly_table,
+                hide_index=True,
+                use_container_width=True,
+                height=min(
+                    290,
+                    40 + 36 * (len(weekly_table) + 1),
+                ),
+            )
+
+            st.caption(
+                f"{len(signals)} official signals "
+                f"across {len(weekly_table)} "
+                "tracked week(s)"
+            )
 
 
 # ============================================================
-# CUMULATIVE PROFIT CHART
+# RIGHT SIDE: CUMULATIVE PERFORMANCE
 # ============================================================
 
-st.subheader("📈 Cumulative Profit")
+with trend_col:
 
-if settled.empty:
-    st.info(
-        "The profit chart will appear after "
-        "the first official 4+ signal finishes "
-        "and is graded."
-    )
+    with st.container(border=True):
 
-else:
-    chart_data = settled.sort_values([
-        "kickoff_sort",
-        "away_team",
-        "home_team",
-    ]).copy()
+        st.markdown(
+            "**Cumulative Performance**"
+        )
 
-    chart_data["Game"] = np.arange(
-        1,
-        len(chart_data) + 1,
-    )
+        if settled.empty:
 
-    chart_data["Cumulative Units"] = (
-        chart_data["profit_units"]
-        .fillna(0)
-        .cumsum()
-    )
+            st.caption(
+                "No games have been graded yet."
+            )
 
-    st.line_chart(
-        chart_data.set_index("Game")[
-            ["Cumulative Units"]
-        ]
-    )
+            st.progress(
+                0.0,
+                text=(
+                    f"0 of {len(signals)} "
+                    "official signals settled"
+                ),
+            )
+
+            st.write(
+                "The profit chart will appear "
+                "when a locked 4+ signal is graded."
+            )
+
+            st.caption(
+                "Only frozen pregame picks "
+                "count toward this chart."
+            )
+
+        else:
+
+            st.caption(
+                "Profit in hypothetical units, "
+                "in kickoff order"
+            )
+
+            trend = settled.sort_values([
+                "kickoff_sort",
+                "away_team",
+                "home_team",
+            ]).copy()
+
+            trend["Game"] = np.arange(
+                1,
+                len(trend) + 1,
+            )
+
+            trend["Cumulative units"] = (
+                trend["profit_units"]
+                .fillna(0)
+                .cumsum()
+            )
+
+            st.line_chart(
+                trend.set_index("Game")[
+                    ["Cumulative units"]
+                ],
+                height=235,
+            )
+
+            st.caption(
+                f"{len(settled)} of {len(signals)} "
+                "official signals settled"
+            )
 
 
 # ============================================================
-# LOCKED MATCHUP CARDS
+# LOCKED MATCHUPS
 # ============================================================
 
 st.divider()
 
 st.subheader("🏈 Locked Matchups")
 
-choice = st.radio(
-    "Display",
-    [
-        "Official 4+ signals",
-        "All locked games",
-    ],
-    horizontal=True,
+left, right = st.columns(
+    [1.5, 1]
 )
 
+with left:
+
+    display = st.radio(
+        "Show",
+        [
+            "Official 4+ signals",
+            "All locked games",
+        ],
+        horizontal=True,
+    )
+
+with right:
+
+    weeks = sorted(
+        season_games["week"]
+        .dropna()
+        .astype(int)
+        .unique()
+        .tolist(),
+        reverse=True,
+    )
+
+    week_choice = st.selectbox(
+        "Week",
+        ["All weeks"] + weeks,
+    )
+
+
+# ============================================================
+# FILTER MATCHUPS
+# ============================================================
+
 shown = (
-    signals
-    if choice == "Official 4+ signals"
-    else season_games
+    signals.copy()
+    if display == "Official 4+ signals"
+    else season_games.copy()
 )
+
+if week_choice != "All weeks":
+
+    shown = shown.loc[
+        shown["week"].eq(week_choice)
+    ]
 
 shown = shown.sort_values(
     "kickoff_sort",
     ascending=False,
 )
 
+
+# ============================================================
+# MATCHUP CARDS
+# ============================================================
+
 if shown.empty:
+
     st.info(
-        "No games match this selection."
+        "No saved matchups match your filters."
     )
 
 else:
+
     for _, game in shown.iterrows():
 
         away = str(game["away_team"])
@@ -547,64 +685,83 @@ else:
 
         with st.container(border=True):
 
-            (
-                a_logo,
-                a_team,
-                h_logo,
-                h_team,
-                result,
-            ) = st.columns(
-                [0.75, 1.8, 0.75, 1.8, 1.35],
-                gap="small",
+            a_col, h_col, result_col = st.columns(
+                [1.6, 1.6, 1.2],
                 vertical_alignment="center",
             )
 
-            with a_logo:
-                st.image(
-                    logo(away),
-                    width=58,
+            # AWAY TEAM
+
+            with a_col:
+
+                a_logo, a_name = st.columns(
+                    [1, 3],
+                    vertical_alignment="center",
                 )
 
-            with a_team:
-                st.markdown(
-                    f"**{away} · "
-                    f"{TEAM_NAMES.get(away, away)}**"
-                )
-                st.caption("AWAY")
+                with a_logo:
 
-            with h_logo:
-                st.image(
-                    logo(home),
-                    width=58,
-                )
-
-            with h_team:
-                st.markdown(
-                    f"**{home} · "
-                    f"{TEAM_NAMES.get(home, home)}**"
-                )
-                st.caption(
-                    kickoff_label(
-                        game["kickoff_utc"]
+                    st.image(
+                        team_logo(away),
+                        width=52,
                     )
+
+                with a_name:
+
+                    st.markdown(
+                        f"**{away} · "
+                        f"{TEAM_NAMES.get(away, away)}**"
+                    )
+
+                    st.caption("AWAY")
+
+            # HOME TEAM
+
+            with h_col:
+
+                h_logo, h_name = st.columns(
+                    [1, 3],
+                    vertical_alignment="center",
                 )
 
-            with result:
-                badge = {
+                with h_logo:
+
+                    st.image(
+                        team_logo(home),
+                        width=52,
+                    )
+
+                with h_name:
+
+                    st.markdown(
+                        f"**{home} · "
+                        f"{TEAM_NAMES.get(home, home)}**"
+                    )
+
+                    st.caption("HOME")
+
+            # GAME RESULT
+
+            with result_col:
+
+                status_label = {
                     "WIN": "🟢 WIN",
                     "LOSS": "🔴 LOSS",
                     "PUSH": "⚪ PUSH",
                 }.get(
                     status,
-                    "🕒 PENDING",
+                    "⏳ PENDING",
                 )
 
-                st.markdown(f"**{badge}**")
+                st.markdown(
+                    f"**{status_label}**"
+                )
 
                 if (
                     pd.notna(game.get("away_score"))
                     and pd.notna(game.get("home_score"))
                 ):
+
                     st.caption(
                         f"Final: {away} "
                         f"{int(game['away_score'])}"
@@ -612,77 +769,120 @@ else:
                         f"{int(game['home_score'])}"
                     )
 
+            st.caption(
+                kickoff_label(
+                    game["kickoff_utc"]
+                )
+            )
+
             st.divider()
 
-            c1, c2, c3 = st.columns(3)
+            # --------------------------------
+            # PREDICTION DETAILS
+            # --------------------------------
 
-            with c1:
-                st.caption("LOCKED MODEL PICK")
+            p1, p2, p3 = st.columns(
+                3,
+                gap="medium",
+            )
+
+            with p1:
+
+                st.caption(
+                    "LOCKED MODEL PICK"
+                )
+
                 st.markdown(
-                    f"**{game.get('model_pick', '—')}**"
+                    f"**{readable(game.get('model_pick'))}**"
                 )
+
                 st.caption(
-                    f"Official signal: {game['signal']}"
+                    "Saved signal: "
+                    f"{readable(game.get('signal'))}"
                 )
 
-            with c2:
-                st.caption("CONSENSUS EDGE")
+            with p2:
 
-                if pd.notna(
-                    game["consensus_edge"]
-                ):
-                    edge = abs(
-                        float(game["consensus_edge"])
-                    )
+                st.caption(
+                    "CONSENSUS EDGE"
+                )
+
+                edge = pd.to_numeric(
+                    game.get("consensus_edge"),
+                    errors="coerce",
+                )
+
+                if pd.notna(edge):
+
                     st.markdown(
-                        f"**{edge:.2f} points**"
+                        f"**{abs(edge):.2f} pts**"
                     )
+
                 else:
-                    st.markdown("—")
+
+                    st.markdown("**—**")
 
                 st.caption(
-                    f"Consensus: "
-                    f"{game.get('market_line', '—')}"
+                    "Market: "
+                    f"{readable(game.get('market_line'))}"
                 )
 
-            with c3:
+            with p3:
+
                 st.caption(
                     "LOCKED BEST SPORTSBOOK LINE"
                 )
 
                 st.markdown(
-                    f"**{game.get('best_available_line', '—')}**"
+                    "**"
+                    + readable(
+                        game.get("best_available_line")
+                    )
+                    + "**"
                 )
 
                 st.caption(
-                    f"{game.get('best_bookmaker', '—')} "
-                    f"· {price_label(game.get('best_price'))} "
-                    "odds"
+                    f"{readable(game.get('best_bookmaker'))}"
+                    " · "
+                    f"{price_label(game.get('best_price'))}"
+                    " odds"
                 )
+
+            # --------------------------------
+            # TRACKED RETURNS
+            # --------------------------------
 
             if (
                 game["signal"] == "4+ EDGE"
-                and status in ["WIN", "LOSS", "PUSH"]
+                and status in {
+                    "WIN",
+                    "LOSS",
+                    "PUSH",
+                }
             ):
-                if pd.notna(
-                    game["profit_units"]
-                ):
+
+                units = pd.to_numeric(
+                    game.get("profit_units"),
+                    errors="coerce",
+                )
+
+                if pd.notna(units):
+
                     st.caption(
-                        "Graded return: "
-                        f"{float(game['profit_units']):+.2f} "
-                        "units"
+                        "Official tracked return: "
+                        f"{units:+.2f} units"
                     )
 
 
 # ============================================================
-# COMPLETE HISTORY TABLE
+# COMPLETE PREDICTION HISTORY
 # ============================================================
 
 with st.expander(
-    "Complete Frozen Prediction Table"
+    "View Complete Prediction History Table"
 ):
 
-    columns = {
+    rename = {
         "week": "Week",
         "gameday": "Date",
         "away_team": "Away",
@@ -700,15 +900,22 @@ with st.expander(
 
     table = season_games[
         [
-            key
-            for key in columns
-            if key in season_games.columns
+            c
+            for c in rename
+            if c in season_games
         ]
-    ].rename(columns=columns)
+    ].rename(
+        columns=rename
+    ).copy()
 
     for col in ["Edge", "Units"]:
+
         if col in table:
-            table[col] = table[col].round(2)
+
+            table[col] = pd.to_numeric(
+                table[col],
+                errors="coerce",
+            ).round(2)
 
     st.dataframe(
         table,
@@ -718,22 +925,28 @@ with st.expander(
 
 
 # ============================================================
-# NAVIGATION & DISCLAIMER
+# NAVIGATION
 # ============================================================
 
 if Path("app.py").exists():
+
     st.page_link(
         "app.py",
         label="Back to Current Predictions",
         icon="🏈",
     )
 
+
+# ============================================================
+# DISCLAIMER
+# ============================================================
+
 st.divider()
 
 st.caption(
-    "Forward tracking only: these are recorded "
-    "pregame model signals, not evidence of bets "
-    "placed. Historical backtests and current odds "
-    "snapshots are separate. A model edge is not "
-    "a calibrated probability."
+    "Forward-tracked pregame snapshots only. "
+    "These are model signals, not confirmed bets. "
+    "Current sportsbook lines can change. "
+    "Historical backtests are separate "
+    "from these results."
 )
